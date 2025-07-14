@@ -18,7 +18,7 @@ type Truck = {
 const trucksCollection = collection(db, 'trucks');
 
 const Fleet: React.FC = () => {
-  // Importar Excel
+  // Importar Excel y llenar toda la tabla
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -26,8 +26,19 @@ const Fleet: React.FC = () => {
     const workbook = XLSX.read(data, { type: 'array' });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(sheet);
+    // Limpiar toda la colección antes de importar (opcional, solo si quieres reemplazar todo)
+    // Si quieres conservar los existentes y solo agregar nuevos, comenta el siguiente bloque
+    const batchDelete = async () => {
+      const { getDocs } = await import('firebase/firestore');
+      const snapshot = await getDocs(trucksCollection);
+      snapshot.forEach((docSnap: any) => {
+        deleteDoc(doc(db, 'trucks', docSnap.id));
+      });
+    };
+    await batchDelete();
+    // Importar todos los camiones del Excel
+    const nuevosTrucks: Truck[] = [];
     for (const row of rows) {
-      // Espera que los títulos sean: economico, unidad, asignadoA, modelo, placas, ubicacion, carga, volumen
       const { economico, unidad, asignadoA, modelo, placas, ubicacion, carga, volumen } = row as any;
       if (economico && unidad && asignadoA && modelo && placas && ubicacion && carga != null && volumen != null) {
         await setDoc(doc(trucksCollection, String(economico)), {
@@ -40,8 +51,19 @@ const Fleet: React.FC = () => {
           carga: Number(carga),
           volumen: Number(volumen)
         });
+        nuevosTrucks.push({
+          economico: String(economico),
+          unidad: String(unidad),
+          asignadoA: String(asignadoA),
+          modelo: String(modelo),
+          placas: String(placas),
+          ubicacion: String(ubicacion),
+          carga: Number(carga),
+          volumen: Number(volumen)
+        });
       }
     }
+    setTrucks(nuevosTrucks);
     e.target.value = '';
     alert('Flota importada correctamente');
   };
@@ -100,8 +122,54 @@ const Fleet: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', background: '#fff', borderRadius: 12, boxShadow: '0 2px 12px #0002', padding: 24 }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 8 }}>
+    <div className="fleet-responsive-container">
+      <style>{`
+        .fleet-responsive-container {
+          max-width: 900px;
+          margin: 0 auto;
+          background: #fff;
+          border-radius: 12px;
+          box-shadow: 0 2px 12px #0002;
+          padding: 24px;
+        }
+        .fleet-table {
+          width: 100%;
+          border-collapse: collapse;
+          background: #f5f5f5;
+          border-radius: 8px;
+          overflow-x: auto;
+          display: block;
+        }
+        .fleet-table th, .fleet-table td {
+          padding: 8px 4px;
+          font-size: 15px;
+        }
+        @media (max-width: 600px) {
+          .fleet-responsive-container {
+            padding: 8px;
+            border-radius: 0;
+            box-shadow: none;
+          }
+          .fleet-table th, .fleet-table td {
+            font-size: 13px;
+            padding: 6px 2px;
+          }
+          .fleet-table {
+            font-size: 13px;
+            min-width: 600px;
+            border-radius: 0;
+          }
+          h1, h2 {
+            font-size: 20px !important;
+            margin-bottom: 10px !important;
+          }
+          input, button {
+            font-size: 13px !important;
+            padding: 4px 8px !important;
+          }
+        }
+      `}</style>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 8 }}>
         <label style={{ fontSize: 14, color: '#3949ab', fontWeight: 'bold', marginRight: 8 }}>Importar Excel:</label>
         <input type="file" accept=".xlsx,.xls" style={{ width: 140 }} onChange={handleImportExcel} />
       </div>
@@ -113,83 +181,85 @@ const Fleet: React.FC = () => {
           placeholder="Buscar por número económico..."
           value={searchEconomico}
           onChange={e => setSearchEconomico(e.target.value)}
-          style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #ccc', width: 300 }}
+          style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #ccc', width: '100%', maxWidth: 300 }}
         />
       </div>
-      <table style={{ width: '100%', borderCollapse: 'collapse', background: '#f5f5f5', borderRadius: 8 }}>
-        <thead style={{ background: '#3949ab', color: '#fff' }}>
-          <tr>
-            <th>ECONOMICO</th>
-            <th>UNIDAD</th>
-            <th>ASIGNADO A</th>
-            <th>MODELO</th>
-            <th>PLACAS</th>
-            <th>UBICACION</th>
-            <th>Cap. Carga (kg)</th>
-            <th>Cap. Volumen (m³)</th>
-            {/* Eliminados Alto, Largo, Ancho */}
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {trucks.filter(truck => truck.economico.toLowerCase().includes(searchEconomico.toLowerCase())).map((truck, idx) => {
-            // Función para resaltar coincidencias
-            const highlight = (text: string, search: string) => {
-              if (!search) return text;
-              const regex = new RegExp(`(${search})`, 'gi');
-              return text.replace(regex, '<mark style="background: #ffe082; color: #222; padding: 0 2px; border-radius: 2px;">$1</mark>');
-            };
-            return (
-              <tr key={idx}>
-                {editIndex === idx ? (
-                  <>
-                    <td><input value={truck.economico} disabled style={{ background: '#eee' }} /></td>
-                    <td><input value={truck.unidad} onChange={e => handleInputChange(e, 'unidad', idx)} /></td>
-                    <td><input value={truck.asignadoA} onChange={e => handleInputChange(e, 'asignadoA', idx)} /></td>
-                    <td><input value={truck.modelo} onChange={e => handleInputChange(e, 'modelo', idx)} /></td>
-                    <td><input value={truck.placas} onChange={e => handleInputChange(e, 'placas', idx)} /></td>
-                    <td><input value={truck.ubicacion} onChange={e => handleInputChange(e, 'ubicacion', idx)} /></td>
-                    <td><input type="number" value={truck.carga} onChange={e => handleInputChange(e, 'carga', idx)} /></td>
-                    <td>{truck.volumen.toFixed(2)}</td>
-                    {/* Eliminados Alto, Largo, Ancho */}
-                    <td>
-                      <button style={{ background: '#43a047', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 10px', marginRight: 4 }} onClick={() => handleSave(idx)}>Guardar</button>
-                    </td>
-                  </>
-                ) : (
-                  <>
-                    <td dangerouslySetInnerHTML={{ __html: highlight(truck.economico, searchEconomico) }}></td>
-                    <td>{truck.unidad}</td>
-                    <td>{truck.asignadoA}</td>
-                    <td>{truck.modelo}</td>
-                    <td>{truck.placas}</td>
-                    <td>{truck.ubicacion}</td>
-                    <td>{truck.carga}</td>
-                    <td>{truck.volumen.toFixed(2)}</td>
-                    {/* Eliminados Alto, Largo, Ancho */}
-                    <td>
-                      <button style={{ background: '#1976d2', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 10px', marginRight: 4 }} onClick={() => handleEdit(idx)}>Editar</button>
-                      <button style={{ background: '#d32f2f', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 10px' }} onClick={() => handleDelete(idx)}>Eliminar</button>
-                    </td>
-                  </>
-                )}
-              </tr>
-            );
-          })}
-          <tr>
-            <td><input value={newTruck.economico} onChange={e => handleInputChange(e, 'economico')} /></td>
-            <td><input value={newTruck.unidad} onChange={e => handleInputChange(e, 'unidad')} /></td>
-            <td><input value={newTruck.asignadoA} onChange={e => handleInputChange(e, 'asignadoA')} /></td>
-            <td><input value={newTruck.modelo} onChange={e => handleInputChange(e, 'modelo')} /></td>
-            <td><input value={newTruck.placas} onChange={e => handleInputChange(e, 'placas')} /></td>
-            <td><input value={newTruck.ubicacion} onChange={e => handleInputChange(e, 'ubicacion')} /></td>
-            <td><input type="number" value={newTruck.carga} onChange={e => handleInputChange(e, 'carga')} /></td>
-            <td><input type="number" value={newTruck.volumen} onChange={e => handleInputChange(e, 'volumen')} /></td>
-            {/* Eliminados Alto, Largo, Ancho */}
-            <td><button style={{ background: '#ffb300', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 10px' }} onClick={handleAdd}>Agregar</button></td>
-          </tr>
-        </tbody>
-      </table>
+      <div style={{ overflowX: 'auto' }}>
+        <table className="fleet-table">
+          <thead style={{ background: '#3949ab', color: '#fff' }}>
+            <tr>
+              <th>ECONOMICO</th>
+              <th>UNIDAD</th>
+              <th>ASIGNADO A</th>
+              <th>MODELO</th>
+              <th>PLACAS</th>
+              <th>UBICACION</th>
+              <th>Cap. Carga (kg)</th>
+              <th>Cap. Volumen (m³)</th>
+              {/* Eliminados Alto, Largo, Ancho */}
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {trucks.filter(truck => truck.economico.toLowerCase().includes(searchEconomico.toLowerCase())).map((truck, idx) => {
+              // Función para resaltar coincidencias
+              const highlight = (text: string, search: string) => {
+                if (!search) return text;
+                const regex = new RegExp(`(${search})`, 'gi');
+                return text.replace(regex, '<mark style="background: #ffe082; color: #222; padding: 0 2px; border-radius: 2px;">$1</mark>');
+              };
+              return (
+                <tr key={idx}>
+                  {editIndex === idx ? (
+                    <>
+                      <td><input value={truck.economico} disabled style={{ background: '#eee' }} /></td>
+                      <td><input value={truck.unidad} onChange={e => handleInputChange(e, 'unidad', idx)} /></td>
+                      <td><input value={truck.asignadoA} onChange={e => handleInputChange(e, 'asignadoA', idx)} /></td>
+                      <td><input value={truck.modelo} onChange={e => handleInputChange(e, 'modelo', idx)} /></td>
+                      <td><input value={truck.placas} onChange={e => handleInputChange(e, 'placas', idx)} /></td>
+                      <td><input value={truck.ubicacion} onChange={e => handleInputChange(e, 'ubicacion', idx)} /></td>
+                      <td><input type="number" value={truck.carga} onChange={e => handleInputChange(e, 'carga', idx)} /></td>
+                      <td>{truck.volumen.toFixed(2)}</td>
+                      {/* Eliminados Alto, Largo, Ancho */}
+                      <td>
+                        <button style={{ background: '#43a047', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 10px', marginRight: 4 }} onClick={() => handleSave(idx)}>Guardar</button>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td dangerouslySetInnerHTML={{ __html: highlight(truck.economico, searchEconomico) }}></td>
+                      <td>{truck.unidad}</td>
+                      <td>{truck.asignadoA}</td>
+                      <td>{truck.modelo}</td>
+                      <td>{truck.placas}</td>
+                      <td>{truck.ubicacion}</td>
+                      <td>{truck.carga}</td>
+                      <td>{truck.volumen.toFixed(2)}</td>
+                      {/* Eliminados Alto, Largo, Ancho */}
+                      <td>
+                        <button style={{ background: '#1976d2', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 10px', marginRight: 4 }} onClick={() => handleEdit(idx)}>Editar</button>
+                        <button style={{ background: '#d32f2f', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 10px' }} onClick={() => handleDelete(idx)}>Eliminar</button>
+                      </td>
+                    </>
+                  )}
+                </tr>
+              );
+            })}
+            <tr>
+              <td><input value={newTruck.economico} onChange={e => handleInputChange(e, 'economico')} /></td>
+              <td><input value={newTruck.unidad} onChange={e => handleInputChange(e, 'unidad')} /></td>
+              <td><input value={newTruck.asignadoA} onChange={e => handleInputChange(e, 'asignadoA')} /></td>
+              <td><input value={newTruck.modelo} onChange={e => handleInputChange(e, 'modelo')} /></td>
+              <td><input value={newTruck.placas} onChange={e => handleInputChange(e, 'placas')} /></td>
+              <td><input value={newTruck.ubicacion} onChange={e => handleInputChange(e, 'ubicacion')} /></td>
+              <td><input type="number" value={newTruck.carga} onChange={e => handleInputChange(e, 'carga')} /></td>
+              <td><input type="number" value={newTruck.volumen} onChange={e => handleInputChange(e, 'volumen')} /></td>
+              {/* Eliminados Alto, Largo, Ancho */}
+              <td><button style={{ background: '#ffb300', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 10px' }} onClick={handleAdd}>Agregar</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
