@@ -45,7 +45,7 @@ const Inventory: React.FC = () => {
     const { id, ...rest } = newTire;
     if (!id) return;
     await setDoc(doc(tiresCollection, id), rest);
-    setNewTire({ id: '', descripcion: '', alto: 0, largo: 0, ancho: 0, peso: 0, volumen: 0, valor: 0 });
+    setNewTire({ id: '', descripcion: '', peso: 0, volumen: 0, valor: 0 });
   };
 
   const handleEdit = (idx: number) => setEditIndex(idx);
