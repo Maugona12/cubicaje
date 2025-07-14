@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import XLSX from './xlsx-fleet';
+import * as XLSX from 'xlsx';
 import { db } from '../firebase';
 import { collection, setDoc, updateDoc, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
 
