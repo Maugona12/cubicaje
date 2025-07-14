@@ -1,6 +1,7 @@
 // Utilidad para formato de dinero
 const formatMoney = (value: number) => `$${value.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`;
 import React, { useState, useEffect } from 'react';
+import XLSX from './xlsx';
 import { db } from '../firebase';
 import { collection, setDoc, updateDoc, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
 
@@ -15,6 +16,29 @@ type Tire = {
 const tiresCollection = collection(db, 'tires');
 
 const Inventory: React.FC = () => {
+  // Importar Excel
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const data = await file.arrayBuffer();
+    const workbook = XLSX.read(data, { type: 'array' });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet);
+    for (const row of rows) {
+      // Espera que los títulos sean: id, descripcion, peso, volumen, valor
+      const { id, descripcion, peso, volumen, valor } = row as any;
+      if (id && descripcion && peso != null && volumen != null && valor != null) {
+        await setDoc(doc(tiresCollection, String(id)), {
+          descripcion: String(descripcion),
+          peso: Number(peso),
+          volumen: Number(volumen),
+          valor: Number(valor)
+        });
+      }
+    }
+    e.target.value = '';
+    alert('Inventario importado correctamente');
+  };
   const [tires, setTires] = useState<Tire[]>([]);
   const [searchId, setSearchId] = useState('');
   // Cargar y escuchar cambios en tiempo real
@@ -64,6 +88,10 @@ const Inventory: React.FC = () => {
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', background: '#fff', borderRadius: 12, boxShadow: '0 2px 12px #0002', padding: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 8 }}>
+        <label style={{ fontSize: 14, color: '#3949ab', fontWeight: 'bold', marginRight: 8 }}>Importar Excel:</label>
+        <input type="file" accept=".xlsx,.xls" style={{ width: 140 }} onChange={handleImportExcel} />
+      </div>
       <h1 style={{ textAlign: 'center', color: '#1a237e', marginBottom: 8 }}>Comercializadora de Llantas Tres Siglos</h1>
       <h2 style={{ textAlign: 'center', color: '#3949ab', marginBottom: 24 }}>Inventario de Llantas</h2>
       <div style={{ marginBottom: 16 }}>

@@ -37,32 +37,41 @@ const pedidosCollection = collection(db, 'pedidos');
 
 const Orders: React.FC = () => {
   const [tires, setTires] = useState<Tire[]>([]);
-  // Cargar inventario de llantas
   useEffect(() => {
     const unsubscribe = onSnapshot(tiresCollection, (snapshot) => {
       setTires(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Tire));
     });
     return () => unsubscribe();
   }, []);
-  const [camion, setCamion] = useState(() => localStorage.getItem('pedido_camion') || '');
-  const [llantas, setLlantas] = useState<PedidoLlantas[]>(() => {
-    const saved = localStorage.getItem('pedido_llantas');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [nuevaLlanta, setNuevaLlanta] = useState<PedidoLlantas>(() => {
-    const saved = localStorage.getItem('pedido_nuevaLlanta');
-    return saved ? JSON.parse(saved) : { codigoLlanta: '', descripcion: '', cantidad: 1, peso: 0, volumen: 0, valor: 0 };
-  });
-  // Guardar en localStorage cada vez que cambian los datos del pedido en curso
+  // Estado inicial vacío
+  const [camion, setCamion] = useState<string>('');
+  const [llantas, setLlantas] = useState<PedidoLlantas[]>([]);
+  const [nuevaLlanta, setNuevaLlanta] = useState<PedidoLlantas>({ codigoLlanta: '', descripcion: '', cantidad: 1, peso: 0, volumen: 0, valor: 0 });
+  // Sincronizar pedido en progreso con Firestore
   useEffect(() => {
-    localStorage.setItem('pedido_camion', camion);
-  }, [camion]);
+    const draftRef = doc(db, 'pedidos_draft', 'draft');
+    const unsubscribe = onSnapshot(draftRef, (snapshot) => {
+      const data = snapshot.data();
+      if (data) {
+        setCamion(data.camion || '');
+        setLlantas(data.llantas || []);
+        setNuevaLlanta(data.nuevaLlanta || { codigoLlanta: '', descripcion: '', cantidad: 1, peso: 0, volumen: 0, valor: 0 });
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+  // Guardar cambios en Firestore
   useEffect(() => {
-    localStorage.setItem('pedido_llantas', JSON.stringify(llantas));
-  }, [llantas]);
-  useEffect(() => {
-    localStorage.setItem('pedido_nuevaLlanta', JSON.stringify(nuevaLlanta));
-  }, [nuevaLlanta]);
+    if (!camion && llantas.length === 0 && !nuevaLlanta.codigoLlanta) return;
+    const draftRef = doc(db, 'pedidos_draft', 'draft');
+    import('firebase/firestore').then(({ setDoc }) =>
+      setDoc(draftRef, {
+        camion,
+        llantas,
+        nuevaLlanta
+      })
+    );
+  }, [camion, llantas, nuevaLlanta]);
   const [pedidos, setPedidos] = useState<any[]>([]);
   const [trucks, setTrucks] = useState<Truck[]>([]);
   const [selectedTruck, setSelectedTruck] = useState<Truck | null>(null);
@@ -128,8 +137,6 @@ const Orders: React.FC = () => {
   const handleAgregarLlanta = () => {
     setLlantas([...llantas, nuevaLlanta]);
     setNuevaLlanta({ codigoLlanta: '', descripcion: '', cantidad: 1, peso: 0, volumen: 0, valor: 0 });
-    // Limpiar también en localStorage
-    localStorage.setItem('pedido_nuevaLlanta', JSON.stringify({ codigoLlanta: '', descripcion: '', cantidad: 1, peso: 0, volumen: 0, valor: 0 }));
   };
 
   // Calcula totales
@@ -151,10 +158,15 @@ const Orders: React.FC = () => {
     setLlantas([]);
     setNuevaLlanta({ codigoLlanta: '', descripcion: '', cantidad: 1, peso: 0, volumen: 0, valor: 0 });
     setSelectedTruck(null);
-    // Limpiar localStorage
-    localStorage.removeItem('pedido_camion');
-    localStorage.removeItem('pedido_llantas');
-    localStorage.removeItem('pedido_nuevaLlanta');
+    // Limpiar borrador en Firestore
+    const draftRef = doc(db, 'pedidos_draft', 'draft');
+    import('firebase/firestore').then(({ setDoc }) =>
+      setDoc(draftRef, {
+        camion: '',
+        llantas: [],
+        nuevaLlanta: { codigoLlanta: '', descripcion: '', cantidad: 1, peso: 0, volumen: 0, valor: 0 }
+      })
+    );
   };
 
   // Cancela pedido
