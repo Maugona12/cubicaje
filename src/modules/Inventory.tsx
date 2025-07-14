@@ -1,7 +1,7 @@
 // Utilidad para formato de dinero
 const formatMoney = (value: number) => `$${value.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`;
 import React, { useState, useEffect } from 'react';
-import XLSX from './xlsx';
+import * as XLSX from 'xlsx';
 import { db } from '../firebase';
 import { collection, setDoc, updateDoc, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
 
