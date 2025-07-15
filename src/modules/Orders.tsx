@@ -194,7 +194,53 @@ const Orders: React.FC = () => {
   }
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', background: '#fff', borderRadius: 12, boxShadow: '0 2px 12px #0002', padding: 24 }}>
+    <div className="orders-responsive-container">
+      <style>{`
+        .orders-responsive-container {
+          max-width: 900px;
+          margin: 0 auto;
+          background: #fff;
+          border-radius: 12px;
+          box-shadow: 0 2px 12px #0002;
+          padding: 24px;
+        }
+        .orders-table {
+          width: 100%;
+          border-collapse: collapse;
+          background: #f5f5f5;
+          border-radius: 8px;
+          overflow-x: auto;
+          display: block;
+        }
+        .orders-table th, .orders-table td {
+          padding: 8px 4px;
+          font-size: 15px;
+        }
+        @media (max-width: 600px) {
+          .orders-responsive-container {
+            padding: 8px;
+            border-radius: 0;
+            box-shadow: none;
+          }
+          .orders-table th, .orders-table td {
+            font-size: 13px;
+            padding: 6px 2px;
+          }
+          .orders-table {
+            font-size: 13px;
+            min-width: 600px;
+            border-radius: 0;
+          }
+          h1, h2, h3, h4 {
+            font-size: 20px !important;
+            margin-bottom: 10px !important;
+          }
+          input, button {
+            font-size: 13px !important;
+            padding: 4px 8px !important;
+          }
+        }
+      `}</style>
       <h1 style={{ textAlign: 'center', color: '#1a237e', marginBottom: 8 }}>Comercializadora de Llantas Tres Siglos</h1>
       <h2 style={{ textAlign: 'center', color: '#3949ab', marginBottom: 24 }}>Pedidos</h2>
       <div style={{ marginBottom: 20 }}>
